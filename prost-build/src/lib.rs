@@ -117,7 +117,7 @@ use std::default;
 use std::env;
 use std::fmt;
 use std::fs;
-use std::io::{Error, ErrorKind, Result};
+use std::io::{Error, ErrorKind, Result, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -182,6 +182,7 @@ pub trait ServiceGenerator {
 ///
 /// This configuration builder can be used to set non-default code generation options.
 pub struct Config {
+    include_file_descriptor_set: bool,
     service_generator: Option<Box<dyn ServiceGenerator>>,
     btree_map: Vec<String>,
     bytes: Vec<String>,
@@ -520,6 +521,15 @@ impl Config {
         self
     }
 
+    /// Configures the code generator to output the encoded bytes of the `FileDescriptorSet`
+    /// for this `protoc` invocation to a file named `file_descriptor_set.bin` in the configured
+    /// output directory. This can be used in conjunction with the `include_bytes!` macro and
+    /// the types in the `prost-types` crate for implementing some reflection capabilities.
+    pub fn include_file_descriptor_set(&mut self) -> &mut Self {
+        self.include_file_descriptor_set = true;
+        self
+    }
+
     /// Configures the code generator to not strip the enum name from variant names.
     ///
     /// Protobuf enum definitions commonly include the enum name as a prefix of every variant name.
@@ -616,6 +626,12 @@ impl Config {
             )
         })?;
 
+        if self.include_file_descriptor_set {
+            let filename = target.join("file_descriptor_set.bin");
+            let mut file = std::fs::File::create(filename)?;
+            file.write_all(&buf)?;
+        }
+
         let modules = self.generate(descriptor_set.file)?;
         for (module, content) in modules {
             let mut filename = module.join(".");
@@ -682,6 +698,7 @@ impl Config {
 impl default::Default for Config {
     fn default() -> Config {
         Config {
+            include_file_descriptor_set: false,
             service_generator: None,
             btree_map: Vec::new(),
             bytes: Vec::new(),
