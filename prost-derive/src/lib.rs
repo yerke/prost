@@ -78,7 +78,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     // TODO: This encodes oneof fields in the position of their lowest tag,
     // regardless of the currently occupied variant, is that consequential?
     // See: https://developers.google.com/protocol-buffers/docs/encoding#order
-    fields.sort_by_key(|&(_, ref field)| field.tags().into_iter().min().unwrap());
+    fields.sort_by_key(|&(_, ref field)| field.tags().into_iter().min().unwrap_or(0));
     let fields = fields;
 
     let mut tags = fields
@@ -101,30 +101,53 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         .map(|&(ref field_ident, ref field)| field.encode(quote!(self.#field_ident)));
 
     let merge = fields.iter().map(|&(ref field_ident, ref field)| {
-        let merge = field.merge(quote!(value));
-        let tags = field
-            .tags()
-            .into_iter()
-            .map(|tag| quote!(#tag))
-            .intersperse(quote!(|));
-        quote! {
-            #(#tags)* => {
-                let mut value = &mut self.#field_ident;
-                #merge.map_err(|mut error| {
-                    error.push(STRUCT_NAME, stringify!(#field_ident));
-                    error
-                })
-            },
+        if field.tags().is_empty() {
+            quote!()
+        } else {
+            let merge = field.merge(quote!(value));
+            let tags = field
+                .tags()
+                .into_iter()
+                .map(|tag| quote!(#tag))
+                .intersperse(quote!(|));
+            quote! {
+                #(#tags)* => {
+                    let mut value = &mut self.#field_ident;
+                    #merge.map_err(|mut error| {
+                        error.push(STRUCT_NAME, stringify!(#field_ident));
+                        error
+                    })
+                },
+            }
         }
     });
 
-    let struct_name = if fields.is_empty() {
+    let unknown_fields_ident_opt = unknown_fields_ident(&fields);
+
+    let encountered_unknown = match unknown_fields_ident_opt.clone() {
+        Some(unknown_field_set_ident) => {
+            quote!(self.#unknown_field_set_ident.skip_unknown_field(tag, wire_type, buf, ctx))
+        }
+        None => {
+            // There is no UnknownFieldSet in this message so it's not possible
+            // to retain unknown values.
+            quote!(::prost::encoding::skip_field(wire_type, tag, buf, ctx))
+        }
+    };
+
+    let struct_name = if num_tags == 0 {
+        // TODO(pgron): Check that this works with empty oneofs
         quote!()
     } else {
         quote!(
             const STRUCT_NAME: &'static str = stringify!(#ident);
         )
     };
+
+    let get_unknown_fields = unknown_fields_ident_opt.map_or(
+        quote!(None),
+        |ident| quote!(self.#ident.data.as_ref().map(|m| m.as_ref())),
+    );
 
     // TODO
     let is_struct = true;
@@ -192,7 +215,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 #struct_name
                 match tag {
                     #(#merge)*
-                    _ => ::prost::encoding::skip_field(wire_type, tag, buf, ctx),
+                    _ => #encountered_unknown,
                 }
             }
 
@@ -203,6 +226,19 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
             fn clear(&mut self) {
                 #(#clear;)*
+            }
+
+            fn get_unknown_fields(&self) -> std::option::Option<&std::collections::BTreeMap<u32, ::prost::UnknownField>> {
+                #get_unknown_fields
+            }
+
+            fn decode_from_unknown(f: &prost::UnknownField) -> Result<Self, prost::DecodeError> {
+                match &f.data {
+                    prost::UnknownFieldData::LengthDelimited(bytes) => {
+                        Self::decode(bytes.as_slice())
+                    }
+                    ufd => Err(prost::DecodeError::new(format!("cannot decode {} from {:?}", stringify!(#ident, #ty_generics), ufd)))
+                }
             }
         }
 
@@ -226,6 +262,15 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     };
 
     Ok(expanded.into())
+}
+
+fn unknown_fields_ident(fields: &Vec<(Ident, Field)>) -> Option<Ident> {
+    fields
+        .iter()
+        .find_map(|&(ref field_ident, ref field)| match field {
+            Field::UnknownFieldSet(_) => Some(field_ident.clone()),
+            _ => None,
+        })
 }
 
 #[proc_macro_derive(Message, attributes(prost))]

@@ -44,7 +44,7 @@ fn fake_scalar(ty: scalar::Ty) -> scalar::Field {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Field {
     pub map_ty: MapTy,
     pub key_ty: scalar::Ty,

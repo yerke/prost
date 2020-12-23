@@ -5,7 +5,7 @@ use syn::Meta;
 
 use crate::field::{set_bool, set_option, tag_attr, word_attr, Label};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Field {
     pub label: Label,
     pub tag: u32,

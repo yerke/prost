@@ -10,14 +10,17 @@ pub extern crate alloc;
 pub use bytes;
 
 mod error;
+pub mod ext;
 mod message;
 mod types;
+mod unknown_field_set;
 
 #[doc(hidden)]
 pub mod encoding;
 
 pub use crate::error::{DecodeError, EncodeError};
 pub use crate::message::Message;
+pub use unknown_field_set::{UnknownField, UnknownFieldData, UnknownFieldSet};
 
 use bytes::{Buf, BufMut};
 

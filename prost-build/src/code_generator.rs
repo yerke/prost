@@ -10,8 +10,8 @@ use prost_types::field_descriptor_proto::{Label, Type};
 use prost_types::source_code_info::Location;
 use prost_types::{
     DescriptorProto, EnumDescriptorProto, EnumValueDescriptorProto, FieldDescriptorProto,
-    FieldOptions, FileDescriptorProto, OneofDescriptorProto, ServiceDescriptorProto,
-    SourceCodeInfo,
+    FieldOptions, FileDescriptorProto, OneofDescriptorProto,
+    ServiceDescriptorProto, SourceCodeInfo,
 };
 
 use crate::ast::{Comments, Method, Service};
@@ -19,6 +19,7 @@ use crate::extern_paths::ExternPaths;
 use crate::ident::{match_ident, to_snake, to_upper_camel};
 use crate::message_graph::MessageGraph;
 use crate::Config;
+use prost::Message;
 
 #[derive(PartialEq)]
 enum Syntax {
@@ -61,6 +62,9 @@ impl<'a> CodeGenerator<'a> {
         file: FileDescriptorProto,
         buf: &mut String,
     ) {
+        let mut fdp_bytes = vec![];
+        file.encode(&mut fdp_bytes).unwrap();
+
         let mut source_info = file
             .source_code_info
             .expect("no source code info in request");
@@ -126,6 +130,52 @@ impl<'a> CodeGenerator<'a> {
 
             code_gen.path.pop();
         }
+
+        if let Some(file_name) = file
+            .name
+            .as_ref()
+            .and_then(|f| f.split(".").next().and_then(|f| f.split("/").last()))
+        {
+            code_gen.push_indent();
+            code_gen.buf.push_str("/// encoded prost_types::FileDescriptorProto for file\n");
+            code_gen.push_indent();
+            code_gen.buf.push_str("#[allow(dead_code)]\n");
+            code_gen.push_indent();
+            code_gen.buf.push_str(&format!("pub static {}_FILE_DESCRIPTOR_PROTO: &'static [u8] = &{:?};\n\n", file_name.to_ascii_uppercase(), fdp_bytes));
+
+            if !file.extension.is_empty() {
+                code_gen.push_mod(&format!("{}_ext", file_name), &format!("Fields in extensions in {}.proto", file_name));
+                for (_, ext) in file.extension.into_iter().enumerate() {
+                    code_gen.append_ext_field(ext);
+                }
+                code_gen.pop_mod()
+            }
+        }
+    }
+
+    fn append_ext_field(&mut self, ext: FieldDescriptorProto) {
+        if ext.label != Some(Label::Optional as i32) {
+            return;
+        }
+        let mut f = |ext: FieldDescriptorProto| -> Option<()> {
+            let name = ext.name.as_ref()?;
+            let extendee_type = ext.extendee.as_ref().map(|s| self.resolve_ident(s))?;
+            let field_type =
+                self.resolve_type(&ext, ext.type_name.as_ref().unwrap_or(&"".to_string()));
+            let num = ext.number?;
+            self.push_indent();
+            self.buf.push_str("#[allow(non_upper_case_globals)]\n");
+            self.push_indent();
+            self.buf.push_str(&format!(
+                "pub const {}: ::prost::ext::ExtFieldOptional<{}, {}> = ::prost::ext::ExtFieldOptional {{ field_number: {}, phantom: ::std::marker::PhantomData }};\n",
+                name,
+                extendee_type,
+                field_type,
+                num
+            ));
+            None
+        };
+        f(ext);
     }
 
     fn append_message(&mut self, message: DescriptorProto) {
@@ -228,12 +278,15 @@ impl<'a> CodeGenerator<'a> {
         }
         self.path.pop();
 
+        self.append_unknown_fields_field();
+
         self.depth -= 1;
         self.push_indent();
         self.buf.push_str("}\n");
 
         if !message.enum_type.is_empty() || !nested_types.is_empty() || !oneof_fields.is_empty() {
-            self.push_mod(&message_name);
+            self.push_indent();
+            self.push_mod(&message_name, &format!("Nested message and enum types in `{}`", message_name));
             self.path.push(3);
             for (nested_type, idx) in nested_types {
                 self.path.push(idx as i32);
@@ -565,6 +618,15 @@ impl<'a> CodeGenerator<'a> {
         self.buf.push_str("}\n");
     }
 
+    fn append_unknown_fields_field(&mut self) {
+        self.push_indent();
+        self.buf.push_str("#[prost(unknown_field_set)]\n");
+        self.buf.push_str("#[serde(skip_serializing, skip_deserializing)]\n");
+        self.push_indent();
+        self.buf
+            .push_str("pub unknown_fields: ::prost::UnknownFieldSet,\n");
+    }
+
     fn location(&self) -> &Location {
         let idx = self
             .source_info
@@ -711,11 +773,9 @@ impl<'a> CodeGenerator<'a> {
         }
     }
 
-    fn push_mod(&mut self, module: &str) {
+    fn push_mod(&mut self, module: &str, doc_str: &str) {
         self.push_indent();
-        self.buf.push_str("/// Nested message and enum types in `");
-        self.buf.push_str(module);
-        self.buf.push_str("`.\n");
+        self.buf.push_str(&format!("/// {}.\n", doc_str));
 
         self.push_indent();
         self.buf.push_str("pub mod ");

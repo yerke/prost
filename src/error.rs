@@ -31,7 +31,7 @@ impl DecodeError {
     ///
     /// Meant to be used only by `Message` implementations.
     #[cold]
-    pub(crate) fn new(description: impl Into<Cow<'static, str>>) -> DecodeError {
+    pub fn new(description: impl Into<Cow<'static, str>>) -> DecodeError {
         DecodeError {
             inner: Box::new(Inner {
                 description: description.into(),

@@ -3,6 +3,7 @@ mod map;
 mod message;
 mod oneof;
 mod scalar;
+mod unknown_field_set;
 
 use std::fmt;
 use std::slice;
@@ -12,7 +13,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Attribute, Ident, Lit, LitBool, Meta, MetaList, MetaNameValue, NestedMeta};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Field {
     /// A scalar field.
     Scalar(scalar::Field),
@@ -24,6 +25,8 @@ pub enum Field {
     Oneof(oneof::Field),
     /// A group field.
     Group(group::Field),
+    /// A unknown_field_set pseudo-field.
+    UnknownFieldSet(unknown_field_set::Field),
 }
 
 impl Field {
@@ -46,6 +49,8 @@ impl Field {
             Field::Oneof(field)
         } else if let Some(field) = group::Field::new(&attrs, inferred_tag)? {
             Field::Group(field)
+        } else if let Some(field) = unknown_field_set::Field::new(&attrs)? {
+            Field::UnknownFieldSet(field)
         } else {
             bail!("no type attribute");
         };
@@ -84,6 +89,7 @@ impl Field {
             Field::Map(ref map) => vec![map.tag],
             Field::Oneof(ref oneof) => oneof.tags.clone(),
             Field::Group(ref group) => vec![group.tag],
+            Field::UnknownFieldSet(ref _set) => vec![],
         }
     }
 
@@ -95,6 +101,7 @@ impl Field {
             Field::Map(ref map) => map.encode(ident),
             Field::Oneof(ref oneof) => oneof.encode(ident),
             Field::Group(ref group) => group.encode(ident),
+            Field::UnknownFieldSet(ref set) => set.encode(ident),
         }
     }
 
@@ -107,6 +114,7 @@ impl Field {
             Field::Map(ref map) => map.merge(ident),
             Field::Oneof(ref oneof) => oneof.merge(ident),
             Field::Group(ref group) => group.merge(ident),
+            Field::UnknownFieldSet(ref set) => set.merge(ident),
         }
     }
 
@@ -118,6 +126,7 @@ impl Field {
             Field::Message(ref msg) => msg.encoded_len(ident),
             Field::Oneof(ref oneof) => oneof.encoded_len(ident),
             Field::Group(ref group) => group.encoded_len(ident),
+            Field::UnknownFieldSet(ref set) => set.encoded_len(ident),
         }
     }
 
@@ -129,6 +138,7 @@ impl Field {
             Field::Map(ref map) => map.clear(ident),
             Field::Oneof(ref oneof) => oneof.clear(ident),
             Field::Group(ref group) => group.clear(ident),
+            Field::UnknownFieldSet(ref set) => set.clear(ident),
         }
     }
 

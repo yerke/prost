@@ -5,7 +5,7 @@ use syn::{parse_str, Lit, Meta, MetaNameValue, NestedMeta, Path};
 
 use crate::field::{set_option, tags_attr};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Field {
     pub ty: Path,
     pub tags: Vec<u32>,

@@ -68,7 +68,11 @@ impl From<time::Duration> for Duration {
         } else {
             nanos as i32
         };
-        let mut duration = Duration { seconds, nanos };
+        let mut duration = Duration {
+            seconds,
+            nanos,
+            ..Default::default()
+        };
         duration.normalize();
         duration
     }
@@ -139,7 +143,11 @@ impl From<std::time::SystemTime> for Timestamp {
                 }
             }
         };
-        Timestamp { seconds, nanos }
+        Timestamp {
+            seconds,
+            nanos,
+            ..Default::default()
+        }
     }
 }
 

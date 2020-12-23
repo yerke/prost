@@ -36,10 +36,12 @@ bench = false
 default = ["prost-derive", "std"]
 no-recursion-limit = []
 std = []
+sq = ["serde"]
 
 [dependencies]
-bytes = { version = "0.6", default-features = false }
+bytes = { version = "1.0", default-features = false }
 prost-derive = { version = "0.6.1", path = "prost-derive", optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
 
 [dev-dependencies]
 criterion = "0.3"

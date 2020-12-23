@@ -103,6 +103,22 @@ fn main() {
         .err()
         .unwrap();
 
+    config
+        .compile_protos(&[src.join("no_unused_results.proto")], includes)
+        .unwrap();
+
+    config
+        .compile_protos(&[src.join("default_trait.proto")], includes)
+        .unwrap();
+
+    config
+        .compile_protos(&[src.join("unknown_fields.proto")], includes)
+        .unwrap();
+
+    config
+        .compile_protos(&[src.join("ext.proto")], includes)
+        .unwrap();
+
     let out_dir =
         &PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR environment variable not set"))
             .join("extern_paths");

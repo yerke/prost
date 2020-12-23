@@ -7,6 +7,7 @@ use quote::{quote, ToTokens, TokenStreamExt};
 use syn::{parse_str, Ident, Lit, LitByteStr, Meta, MetaList, MetaNameValue, NestedMeta, Path};
 
 use crate::field::{bool_attr, set_option, tag_attr, Label};
+use std::fmt::Formatter;
 
 /// A scalar protobuf field.
 #[derive(Clone)]
@@ -14,6 +15,12 @@ pub struct Field {
     pub ty: Ty,
     pub kind: Kind,
     pub tag: u32,
+}
+
+impl std::fmt::Debug for Field {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ty: {:?}, tag: {}", self.ty, self.tag)
+    }
 }
 
 impl Field {

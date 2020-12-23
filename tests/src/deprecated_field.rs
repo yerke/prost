@@ -11,6 +11,7 @@ fn test_warns_when_using_fields_with_deprecated_field() {
     let message = deprecated_field::Test {
         not_outdated: ".ogg".to_string(),
         outdated: ".wav".to_string(),
+        ..Default::default()
     };
     // This test relies on the `#[allow(deprecated)]` attribute to ignore the warning that should
     // be raised by the compiler.

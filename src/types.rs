@@ -15,7 +15,7 @@ use crate::{
         bool, bytes, double, float, int32, int64, skip_field, string, uint32, uint64,
         DecodeContext, WireType,
     },
-    DecodeError, Message,
+    DecodeError, Message, UnknownField, UnknownFieldData,
 };
 
 /// `google.protobuf.BoolValue`
@@ -53,6 +53,17 @@ impl Message for bool {
     }
     fn clear(&mut self) {
         *self = false;
+    }
+
+    fn decode_from_unknown(f: &UnknownField) -> Result<Self, DecodeError>
+    {
+        match f.data {
+            UnknownFieldData::Varint(b) => Ok(b != 0),
+            ref ufd => Err(DecodeError::new(format!(
+                "cannot decode bool from {:?}",
+                ufd
+            ))),
+        }
     }
 }
 
@@ -92,6 +103,18 @@ impl Message for u32 {
     fn clear(&mut self) {
         *self = 0;
     }
+
+    fn decode_from_unknown(f: &UnknownField) -> Result<Self, DecodeError>
+    {
+        match f.data {
+            UnknownFieldData::Varint(u) => Ok(u as u32),
+            UnknownFieldData::ThirtyTwoBit(u) => Ok(u),
+            ref ufd => Err(DecodeError::new(format!(
+                "cannot decode u32 from {:?}",
+                ufd
+            ))),
+        }
+    }
 }
 
 /// `google.protobuf.UInt64Value`
@@ -129,6 +152,17 @@ impl Message for u64 {
     }
     fn clear(&mut self) {
         *self = 0;
+    }
+
+    fn decode_from_unknown(f: &UnknownField) -> Result<Self, DecodeError>
+    {
+        match f.data {
+            UnknownFieldData::SixtyFourBit(u) | UnknownFieldData::Varint(u) => Ok(u),
+            ref ufd => Err(DecodeError::new(format!(
+                "cannot decode u64 from {:?}",
+                ufd
+            ))),
+        }
     }
 }
 
@@ -168,6 +202,19 @@ impl Message for i32 {
     fn clear(&mut self) {
         *self = 0;
     }
+
+    fn decode_from_unknown(f: &UnknownField) -> Result<Self, DecodeError>
+    {
+        println!("i32 tag: {}, data: {:?}", f.tag, f.data);
+        match f.data {
+            UnknownFieldData::ThirtyTwoBit(u) => Ok(u as i32),
+            UnknownFieldData::Varint(u) => Ok(u as i32),
+            ref ufd => Err(DecodeError::new(format!(
+                "cannot decode i32 from {:?}",
+                ufd
+            ))),
+        }
+    }
 }
 
 /// `google.protobuf.Int64Value`
@@ -205,6 +252,19 @@ impl Message for i64 {
     }
     fn clear(&mut self) {
         *self = 0;
+    }
+
+    fn decode_from_unknown(f: &UnknownField) -> Result<Self, DecodeError>
+    {
+        println!("i64 tag: {}, data: {:?}", f.tag, f.data);
+        match f.data {
+            UnknownFieldData::SixtyFourBit(u) => Ok(u as i64),
+            UnknownFieldData::Varint(u) => Ok(u as i64),
+            ref ufd => Err(DecodeError::new(format!(
+                "cannot decode i64 from {:?}",
+                ufd
+            ))),
+        }
     }
 }
 
@@ -244,6 +304,17 @@ impl Message for f32 {
     fn clear(&mut self) {
         *self = 0.0;
     }
+
+    fn decode_from_unknown(f: &UnknownField) -> Result<Self, DecodeError>
+    {
+        match f.data {
+            UnknownFieldData::ThirtyTwoBit(u) => Ok(f32::from_bits(u)),
+            ref ufd => Err(DecodeError::new(format!(
+                "cannot decode f32 from {:?}",
+                ufd
+            ))),
+        }
+    }
 }
 
 /// `google.protobuf.DoubleValue`
@@ -281,6 +352,17 @@ impl Message for f64 {
     }
     fn clear(&mut self) {
         *self = 0.0;
+    }
+
+    fn decode_from_unknown(f: &UnknownField) -> Result<Self, DecodeError>
+    {
+        match f.data {
+            UnknownFieldData::SixtyFourBit(u) => Ok(f64::from_bits(u)),
+            ref ufd => Err(DecodeError::new(format!(
+                "cannot decode f64 from {:?}",
+                ufd
+            ))),
+        }
     }
 }
 
@@ -320,6 +402,19 @@ impl Message for String {
     fn clear(&mut self) {
         self.clear();
     }
+
+    fn decode_from_unknown(f: &UnknownField) -> Result<Self, DecodeError>
+    {
+        match &f.data {
+            UnknownFieldData::LengthDelimited(bytes) => std::str::from_utf8(bytes.as_slice())
+                .map(|s| s.to_string())
+                .map_err(|e| DecodeError::new(e.to_string())),
+            ufd => Err(DecodeError::new(format!(
+                "cannot decode String from {:?}",
+                ufd
+            ))),
+        }
+    }
 }
 
 /// `google.protobuf.BytesValue`
@@ -357,6 +452,17 @@ impl Message for Vec<u8> {
     }
     fn clear(&mut self) {
         self.clear();
+    }
+
+    fn decode_from_unknown(f: &UnknownField) -> Result<Self, DecodeError>
+    {
+        match &f.data {
+            UnknownFieldData::LengthDelimited(bytes) => Ok(bytes.clone()),
+            ufd => Err(DecodeError::new(format!(
+                "cannot decode Vec<u8> from {:?}",
+                ufd
+            ))),
+        }
     }
 }
 
@@ -396,6 +502,16 @@ impl Message for Bytes {
     fn clear(&mut self) {
         self.clear();
     }
+
+    fn decode_from_unknown(f: &UnknownField) -> Result<Self, DecodeError> {
+        match &f.data {
+            UnknownFieldData::LengthDelimited(bytes) => Ok(Bytes::from(bytes.clone())),
+            ufd => Err(DecodeError::new(format!(
+                "cannot decode Bytes from {:?}",
+                ufd
+            ))),
+        }
+    }
 }
 
 /// `google.protobuf.Empty`
@@ -421,4 +537,9 @@ impl Message for () {
         0
     }
     fn clear(&mut self) {}
+
+    fn decode_from_unknown(_f: &UnknownField) -> Result<Self, DecodeError>
+    {
+        Ok(())
+    }
 }

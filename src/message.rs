@@ -7,8 +7,9 @@ use bytes::{Buf, BufMut};
 use crate::encoding::{
     decode_key, encode_varint, encoded_len_varint, message, DecodeContext, WireType,
 };
-use crate::DecodeError;
 use crate::EncodeError;
+use crate::{DecodeError, UnknownField};
+use std::collections::BTreeMap;
 
 /// A Protocol Buffers message.
 pub trait Message: Debug + Send + Sync {
@@ -134,6 +135,12 @@ pub trait Message: Debug + Send + Sync {
 
     /// Clears the message, resetting all fields to their default.
     fn clear(&mut self);
+
+    fn get_unknown_fields(&self) -> Option<&BTreeMap<u32, UnknownField>> {
+        None
+    }
+
+    fn decode_from_unknown(f: &UnknownField) -> Result<Self, DecodeError> where Self: Sized;
 }
 
 impl<M> Message for Box<M>
@@ -163,6 +170,13 @@ where
     }
     fn clear(&mut self) {
         (**self).clear()
+    }
+    fn get_unknown_fields(&self) -> Option<&BTreeMap<u32, UnknownField>> {
+        (**self).get_unknown_fields()
+    }
+
+    fn decode_from_unknown(f: &UnknownField) -> Result<Self, DecodeError> where Self: Sized{
+        M::decode_from_unknown(f).map(Box::new)
     }
 }
 

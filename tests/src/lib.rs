@@ -25,9 +25,12 @@ cfg_if! {
     }
 }
 
+pub mod default_trait;
+pub mod ext;
 pub mod extern_paths;
 pub mod packages;
 pub mod unittest;
+pub mod unknown_fields;
 
 #[cfg(test)]
 mod bootstrap;
@@ -273,6 +276,7 @@ mod tests {
             fuzz_busters: vec![foo::bar_baz::foo_bar_baz::FuzzBuster {
                 t: BTreeMap::<i32, foo::bar_baz::FooBarBaz>::new(),
                 nested_self: None,
+                ..Default::default()
             }],
             p_i_e: 0,
             r#as: 4,
@@ -325,9 +329,12 @@ mod tests {
             super_: 51,
             extern_: 52,
             crate_: 53,
+            ..Default::default()
         };
 
-        let _ = foo::bar_baz::foo_bar_baz::Self_ {};
+        let _ = foo::bar_baz::foo_bar_baz::Self_ {
+            ..Default::default()
+        };
 
         // Test enum ident conversion.
         let _ = foo::bar_baz::foo_bar_baz::StrawberryRhubarbPie::Foo;
@@ -364,6 +371,7 @@ mod tests {
             b: Some(Box::new(B::default())),
             repeated_b: Vec::<B>::new(),
             map_b: BTreeMap::<i32, B>::new(),
+            ..Default::default()
         };
     }
 
@@ -394,11 +402,15 @@ mod tests {
             use crate::recursive_oneof::{a, A, C};
 
             let mut a = Box::new(A {
-                kind: Some(a::Kind::C(C {})),
+                kind: Some(a::Kind::C(C {
+                    ..Default::default()
+                })),
+                ..Default::default()
             });
             for _ in 0..depth {
                 a = Box::new(A {
                     kind: Some(a::Kind::A(a)),
+                    ..Default::default()
                 });
             }
 
@@ -421,7 +433,9 @@ mod tests {
                 a = NestedGroup2 {
                     optionalgroup: Some(Box::new(OptionalGroup {
                         nested_group: Some(a),
+                        ..Default::default()
                     })),
+                    ..Default::default()
                 };
             }
 
@@ -482,9 +496,14 @@ mod tests {
         let _ = A {
             kind: Some(a::Kind::B(Box::new(B {
                 a: Some(Box::new(A {
-                    kind: Some(a::Kind::C(C {})),
+                    kind: Some(a::Kind::C(C {
+                        ..Default::default()
+                    })),
+                    ..Default::default()
                 })),
+                ..Default::default()
             }))),
+            ..Default::default()
         };
     }
 
@@ -518,7 +537,11 @@ mod tests {
         let msg1_bytes = &[0x0B, 0x10, 0x20, 0x0C];
 
         let msg1 = groups::Test1 {
-            groupa: Some(groups::test1::GroupA { i2: Some(32) }),
+            groupa: Some(groups::test1::GroupA {
+                i2: Some(32),
+                ..Default::default()
+            }),
+            ..Default::default()
         };
 
         let mut bytes = Vec::new();
@@ -543,10 +566,17 @@ mod tests {
         let msg2 = groups::Test2 {
             i14: Some(64),
             groupb: vec![
-                groups::test2::GroupB { i16: Some(255) },
-                groups::test2::GroupB { i16: Some(1) },
+                groups::test2::GroupB {
+                    i16: Some(255),
+                    ..Default::default()
+                },
+                groups::test2::GroupB {
+                    i16: Some(1),
+                    ..Default::default()
+                },
             ],
             i17: Some(100),
+            ..Default::default()
         };
 
         let mut bytes = Vec::new();
@@ -561,6 +591,7 @@ mod tests {
         let msg = groups::OneofGroup {
             i1: Some(42),
             field: Some(groups::oneof_group::Field::S2("foo".to_string())),
+            ..Default::default()
         };
         check_message(&msg);
 
@@ -570,7 +601,9 @@ mod tests {
                 i2: None,
                 s1: "foo".to_string(),
                 t1: None,
+                ..Default::default()
             })),
+            ..Default::default()
         };
         check_message(&msg);
 
@@ -580,9 +613,15 @@ mod tests {
                 i2: Some(99),
                 s1: "foo".to_string(),
                 t1: Some(groups::Test1 {
-                    groupa: Some(groups::test1::GroupA { i2: None }),
+                    groupa: Some(groups::test1::GroupA {
+                        i2: None,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
                 }),
+                ..Default::default()
             })),
+            ..Default::default()
         };
         check_message(&msg);
 
@@ -591,7 +630,10 @@ mod tests {
 
     #[test]
     fn test_proto3_presence() {
-        let msg = proto3::presence::A { b: Some(42) };
+        let msg = proto3::presence::A {
+            b: Some(42),
+            ..Default::default()
+        };
 
         check_message(&msg);
     }

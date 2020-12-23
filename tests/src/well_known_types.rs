@@ -7,6 +7,7 @@ fn test_well_known_types() {
         timestamp: Some(::prost_types::Timestamp {
             seconds: 99,
             nanos: 42,
+            ..Default::default()
         }),
         double: Some(42.0_f64),
         float: Some(42.0_f32),
@@ -17,6 +18,7 @@ fn test_well_known_types() {
         bool: Some(false),
         string: Some("value".into()),
         bytes: Some(b"value".to_vec()),
+        ..Default::default()
     };
 
     crate::check_message(&msg);
